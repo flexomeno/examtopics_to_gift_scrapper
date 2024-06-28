@@ -1,5 +1,23 @@
 import re
+import os
+import openai
 
+# Configuración de la API de OpenAI
+openai.api_key = os.getenv("openapikey")
+
+# Función para solicitar la justificación de la respuesta correcta a ChatGPT
+def get_feedback(question, correct_answer):
+    prompt = f"Explain why the answer is '{correct_answer}' for the following question in less than 90 words: {question}"
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are an AWS expert"},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    feedback = response['choices'][0]['message']['content']
+    return feedback
+    
 def convert_to_gift(questions):
     gift_format = ""
 
@@ -17,6 +35,7 @@ def convert_to_gift(questions):
             for answer in answers:
                 if answer[0] == correct_answer:
                     gift_format += "=%s. %s\n" % (answer[0], answer[1])
+                    correct_answer_full = "=%s. %s\n" % (answer[0], answer[1])
                 else:
                     gift_format += "~%s. %s\n" % (answer[0], answer[1])
         else:
@@ -26,10 +45,12 @@ def convert_to_gift(questions):
             for answer in answers:
                 if answer[0] in correct_answers:
                     gift_format += "~%{}% {}. {}\n".format(100 / num_correct, answer[0], answer[1])
+                    correct_answer_full += "~%{}% {}. {}\n".format(100 / num_correct, answer[0], answer[1])
+                    correct_answer_full += " and "
                 else:
                     gift_format += "~%-100% {}. {}\n".format(answer[0], answer[1])
-        
-        gift_format += "}\n\n"
+        feedback = get_feedback(question_text, correct_answer_full)
+        gift_format += f"#### {feedback}\n}}\n\n" 
 
     return gift_format
 
