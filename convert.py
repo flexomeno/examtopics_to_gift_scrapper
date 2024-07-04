@@ -6,8 +6,8 @@ import openai
 openai.api_key = os.getenv("openapikey")
 
 # Función para solicitar la justificación de la respuesta correcta a ChatGPT
-def get_feedback(question, correct_answer):
-    prompt = f"Explain why the answer is '{correct_answer}' for the following question in less than 90 words: {question}"
+def get_feedback(question, correct_answer, wrong_answers):
+    prompt = f"Explain why the answer is '{correct_answer}' and not these answers: '{wrong_answers}' for the following question in less than 160 words: {question}. Also list services which appear in all answers and give a very brief description."
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
@@ -16,11 +16,13 @@ def get_feedback(question, correct_answer):
         ]
     )
     feedback = response['choices'][0]['message']['content']
-    return feedback
-    
+    # Reemplazar dobles saltos de línea con un marcador temporal
+    feedback_final = feedback.replace('\n\n', '\n')
+    return feedback_final
+
 def convert_to_gift(questions):
     gift_format = ""
-
+    wrong_answers = ""
     for question in questions:
         question_text = question.split("\n")[0].strip()
         question_text = re.sub(r"Question #\d+: ", "", question_text)
@@ -35,9 +37,10 @@ def convert_to_gift(questions):
             for answer in answers:
                 if answer[0] == correct_answer:
                     gift_format += "=%s. %s\n" % (answer[0], answer[1])
-                    correct_answer_full = "=%s. %s\n" % (answer[0], answer[1])
+                    correct_answer_full = "%s. %s\n" % (answer[0], answer[1])
                 else:
                     gift_format += "~%s. %s\n" % (answer[0], answer[1])
+                    wrong_answers += "%s. %s\n" % (answer[0], answer[1])
         else:
             # Multiple correct answers
             correct_answers = list(correct_answer)
@@ -45,11 +48,12 @@ def convert_to_gift(questions):
             for answer in answers:
                 if answer[0] in correct_answers:
                     gift_format += "~%{}% {}. {}\n".format(100 / num_correct, answer[0], answer[1])
-                    correct_answer_full += "~%{}% {}. {}\n".format(100 / num_correct, answer[0], answer[1])
+                    correct_answer_full += "{} {}. {}\n".format(100 / num_correct, answer[0], answer[1])
                     correct_answer_full += " and "
                 else:
                     gift_format += "~%-100% {}. {}\n".format(answer[0], answer[1])
-        feedback = get_feedback(question_text, correct_answer_full)
+                    wrong_answers += " {}. {}\n".format(answer[0], answer[1])
+        feedback = get_feedback(question_text, correct_answer_full, wrong_answers)
         gift_format += f"#### {feedback}\n}}\n\n" 
 
     return gift_format
